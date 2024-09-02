@@ -1,0 +1,14 @@
+/* InterfaceDescription.css */
+/*描述信息的样式*/
+.ant-descriptions-item-label {
+  font-size: 16px !important;
+  font-weight: bold !important;
+  color: lightseagreen !important;
+}
+
+/*接口标题的样式*/
+.custom-title {
+  font-size: 18px;
+  font-weight: bold;
+  color: black;
+}
