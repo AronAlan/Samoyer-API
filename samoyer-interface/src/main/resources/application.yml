@@ -1,0 +1,9 @@
+server:
+  port: 8123
+  servlet:
+    #指定全局接口地址加一个api前缀
+    context-path: /api
+samoyer:
+  client:
+    access-key: samoyer
+    secret-key: abcdefgh
