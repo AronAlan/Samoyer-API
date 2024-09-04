@@ -1,5 +1,6 @@
 package com.samoyer.backend.service.impl;
 
+import cn.hutool.http.HttpUtil;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.samoyer.backend.common.ErrorCode;
 import com.samoyer.backend.exception.BusinessException;
@@ -9,6 +10,8 @@ import com.samoyer.samoyerapicommon.model.entity.InterfaceInfo;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
+import javax.annotation.Resource;
+
 /**
  * @author Samoyer
  * @description 针对表【interface_info(接口信息)】的数据库操作Service实现
@@ -17,6 +20,8 @@ import org.springframework.stereotype.Service;
 @Service
 public class InterfaceInfoServiceImpl extends ServiceImpl<InterfaceInfoMapper, InterfaceInfo>
         implements InterfaceInfoService {
+    @Resource
+    private InterfaceInfoMapper interfaceInfoMapper;
 
     @Override
     public void validInterfaceInfo(InterfaceInfo interfaceInfo, boolean add) {

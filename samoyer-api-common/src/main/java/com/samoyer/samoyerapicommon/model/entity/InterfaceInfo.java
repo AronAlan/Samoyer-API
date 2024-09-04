@@ -48,6 +48,11 @@ public class InterfaceInfo implements Serializable {
     private String requestHeader;
 
     /**
+     * 上线接口时用来测试接口连通性的例子
+     */
+    private String testSample;
+
+    /**
      * 响应头
      */
     private String responseHeader;

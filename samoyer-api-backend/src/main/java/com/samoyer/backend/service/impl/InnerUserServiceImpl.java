@@ -30,7 +30,7 @@ public class InnerUserServiceImpl implements InnerUserService {
     public User getInvokeUser(String accessKey) {
         //参数校验
         if (StrUtil.isBlank(accessKey)){
-            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+            throw new BusinessException(ErrorCode.PARAMS_ERROR,"accessKey为空");
         }
 
         //创建查询

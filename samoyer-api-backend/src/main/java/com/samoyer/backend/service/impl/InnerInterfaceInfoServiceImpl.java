@@ -23,20 +23,17 @@ public class InnerInterfaceInfoServiceImpl implements InnerInterfaceInfoService 
 
     /**
      * 根据url和请求方法，获取内部接口的信息
-     * @param url
-     * @param method
      * @return
      */
     @Override
-    public InterfaceInfo getInterfaceInfo(String url, String method) {
-        //参数校验
-        if (StringUtils.isAnyBlank(url,method)){
-            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+    public InterfaceInfo getInterfaceInfo(Integer interfaceId) {
+        //interfaceId校验
+        if (interfaceId == null || interfaceId <= 0) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR,"getInterfaceInfo的interfaceId参数错误");
         }
         //创建查询
         QueryWrapper<InterfaceInfo> queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq("url",url);
-        queryWrapper.eq("method",method);
+        queryWrapper.eq("id",interfaceId);
 
         //返回根据url和请求方法，查询到的 内部接口的信息
         return interfaceInfoMapper.selectOne(queryWrapper);

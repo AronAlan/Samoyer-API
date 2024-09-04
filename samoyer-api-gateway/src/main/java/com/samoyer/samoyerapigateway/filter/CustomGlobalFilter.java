@@ -24,13 +24,16 @@ import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.http.server.reactive.ServerHttpResponseDecorator;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
+import org.springframework.web.util.UriComponentsBuilder;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * 网关全局过滤器
@@ -63,13 +66,25 @@ public class CustomGlobalFilter implements GlobalFilter, Ordered {
         // 2.请求日志
         //从路由交换机中拿到request信息
         ServerHttpRequest request = exchange.getRequest();
+        //从请求头中获取参数
+        HttpHeaders headers = request.getHeaders();
+        String accessKey = headers.getFirst("accessKey");
+        String nonce = headers.getFirst("nonce");
+        String timestamp = headers.getFirst("timestamp");
+        String body = headers.getFirst("body");
+        String sign = headers.getFirst("sign");
+        String interfaceIdStr = headers.getFirst("interfaceId");
+        Integer interfaceId = Integer.valueOf(Objects.requireNonNull(interfaceIdStr));
+
         //请求路径，方法
         //request.getPath().value()的值是没有uri的，/api/name/...
         //并且这里接收的request的uri是网关的端口8080，path是需要转发的接口的uri比如8123
         String path = INTERFACE_HOST + request.getPath().value();
+//        path = removeFirstApi(path);
         String method = request.getMethod().toString();
 
         log.info("id:{}", request.getId());
+        log.info("interfaceId:{}", interfaceId);
         log.info("路径：{}", path);
         log.info("方法：{}", method);
         log.info("参数：{}", request.getQueryParams());
@@ -85,13 +100,6 @@ public class CustomGlobalFilter implements GlobalFilter, Ordered {
         }
 
         // 4.用户鉴权（判断ak,sk是否合法）
-        //从请求头中获取参数
-        HttpHeaders headers = request.getHeaders();
-        String accessKey = headers.getFirst("accessKey");
-        String nonce = headers.getFirst("nonce");
-        String timestamp = headers.getFirst("timestamp");
-        String body = headers.getFirst("body");
-        String sign = headers.getFirst("sign");
 
         //鉴权accessKey
         //使用Dubbo远程调用backend中的实现类，实现类中读取数据库获取accessKey的值
@@ -131,8 +139,8 @@ public class CustomGlobalFilter implements GlobalFilter, Ordered {
         // 5.请求的模拟接口是否存在？
         InterfaceInfo interfaceInfo = null;
         try {
-            //根据路径和方法，尝试从内部接口信息服务获取接口信息
-            interfaceInfo = innerInterfaceInfoService.getInterfaceInfo(path, method);
+            //根据id,尝试从内部接口信息服务获取接口信息
+            interfaceInfo = innerInterfaceInfoService.getInterfaceInfo(interfaceId);
         } catch (Exception e) {
             log.error("getInterfaceInfo error", e);
         }
@@ -143,17 +151,35 @@ public class CustomGlobalFilter implements GlobalFilter, Ordered {
 
         //发送请求前需要确认用户是否还有可用的调用次数
         Integer leftNum = innerUserInterfaceInfoService.getLeftNum(interfaceInfo.getId(), invokeUser.getId());
-        if (leftNum<=0){
+        if (leftNum <= 0) {
             return handleLeftNumInsufficient(response);
         }
 
-        // 6789封装在handleResponse中
-        // 6.请求转发，调用模拟接口
-        // Mono<Void> filter = chain.filter(exchange);
+        //真实的第三方请求路径
+        String url = interfaceInfo.getUrl();
+        // 创建新的请求头
+        HttpHeaders newHeaders = new HttpHeaders();
+        //加入请求头
+        newHeaders.addAll(headers);
+        newHeaders.add("url", url);
+
+        // 重写headers，转发请求到接口
+        ServerHttpRequest newRequest = null;
+        try {
+            newRequest = request.mutate().uri(URI.create(path)).headers(httpHeaders -> httpHeaders.addAll(newHeaders)).build();
+        } catch (Exception e) {
+            throw new RuntimeException("请求发送异常",e);
+        }
+        // 创建新的 ServerWebExchange 对象
+        ServerWebExchange newExchange = exchange.mutate()
+                .request(newRequest)
+                .build();
+
+        // 789封装在handleResponse中
         // 7.响应日志
         // 8.调用成功，接口调用次数 +1
         // 9.调用失败，返回一个规范的错误码
-        return handleResponse(exchange, chain, interfaceInfo.getId(), invokeUser.getId());
+        return handleResponse(newExchange, chain, interfaceInfo.getId(), invokeUser.getId());
     }
 
     @Override
@@ -281,4 +307,16 @@ public class CustomGlobalFilter implements GlobalFilter, Ordered {
         }
     }
 
+    /**
+     * 删除path中前缀/api
+     * @param input
+     * @return
+     */
+    public String removeFirstApi(String input) {
+        int index = input.indexOf("/api");
+        if (index != -1) {
+            return input.substring(0, index) + input.substring(index + 4);
+        }
+        return input;
+    }
 }

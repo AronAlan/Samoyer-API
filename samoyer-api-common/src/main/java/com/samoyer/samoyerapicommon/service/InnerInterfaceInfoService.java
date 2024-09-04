@@ -10,9 +10,8 @@ import com.samoyer.samoyerapicommon.model.entity.InterfaceInfo;
 public interface InnerInterfaceInfoService{
     /**
      * 从数据库中查模拟接口是否存在（请求路径，请求方法，请求参数）
-     * @param path
-     * @param method
+     * @param interfaceId
      * @return
      */
-    InterfaceInfo getInterfaceInfo(String path,String method);
+    InterfaceInfo getInterfaceInfo(Integer interfaceId);
 }

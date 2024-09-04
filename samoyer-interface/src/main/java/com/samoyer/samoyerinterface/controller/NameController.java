@@ -9,7 +9,7 @@ import javax.servlet.http.HttpServletRequest;
 
 /**
  * 名称 接口
- *
+ * drop
  * @author: Samoyer
  * @date: 2024-08-20
  */
@@ -24,15 +24,11 @@ public class NameController {
         return "GET 你的名字是: samoyer";
     }
 
-    @PostMapping
-    public String getNameByPost(@RequestParam String name) {
-        log.info("接收到Post调用，name:{}",name);
-        return "POST 你的名字是:" + name;
-    }
-
     @PostMapping("/user")
     public String getUserNameByPost(@RequestBody User user, HttpServletRequest request) {
         log.info("接收到Post调用，user:{}",user);
         return "POST 你的名字是:" + user.getUsername();
     }
+
+
 }

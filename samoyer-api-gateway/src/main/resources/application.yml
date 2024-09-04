@@ -3,8 +3,8 @@ server:
 spring:
   cloud:
     gateway:
-      default-filters:
-        - AddResponseHeader=source, samoyer
+#      default-filters:
+#        - AddResponseHeader=source, samoyer
       routes:
         - id: api_route
           uri: http://localhost:8123

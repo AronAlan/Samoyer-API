@@ -3,7 +3,6 @@ package com.samoyer.backend.controller;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.google.gson.Gson;
 import com.samoyer.backend.annotation.AuthCheck;
 import com.samoyer.backend.common.*;
 import com.samoyer.backend.constant.CommonConstant;
@@ -26,10 +25,13 @@ import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
+import java.io.UnsupportedEncodingException;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import java.net.URI;
 
 /**
  * 接口管理
@@ -47,8 +49,8 @@ public class InterfaceInfoController {
     @Resource
     private UserService userService;
 
-    @Resource
-    private SamoyerApiClient samoyerApiClient;
+//    @Resource
+//    private SamoyerApiClient samoyerApiClient;
 
     @Resource
     private UserInterfaceInfoService userInterfaceInfoService;
@@ -178,7 +180,7 @@ public class InterfaceInfoController {
 
     @GetMapping("/list/my/page")
     public BaseResponse<Page<MyInterfaceInfoVO>> listMyInterfaceInfoByPage(MyInterfaceInfoQueryRequest myInterfaceInfoQueryRequest,
-                                                                            HttpServletRequest request) {
+                                                                           HttpServletRequest request) {
         //获取当前登录用户
         User loginUser = userService.getLoginUser(request);
         myInterfaceInfoQueryRequest.setUserId(loginUser.getId());
@@ -251,16 +253,35 @@ public class InterfaceInfoController {
             throw new BusinessException(ErrorCode.NOT_FOUND_ERROR);
         }
 
-        //2.判断接口是否可以调用
-        //模拟一个假数据
-        com.samoyer.samoyerapiclientsdk.model.User user = new com.samoyer.samoyerapiclientsdk.model.User();
-        user.setUsername("test");
-        String username = samoyerApiClient.getUserNameByPost(user);
-        if (StrUtil.isBlank(username)) {
-            //系统内部异常
-            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "接口验证失败");
+        //2. TODO 判断接口是否可以调用
+        User loginUser = userService.getLoginUser(request);
+        //创建一个临时的SamoyerApiClient对象，并传入ak和sk
+        SamoyerApiClient tempClient = new SamoyerApiClient(loginUser.getAccessKey(), loginUser.getSecretKey());
+        //使用字段testSample里的例子进行连通性测试
+        String testSample = oldInterfaceInfo.getTestSample();
+        String method = oldInterfaceInfo.getMethod();
+        String path = oldInterfaceInfo.getUrl();
+        String res = "";
+        try {
+            if ("GET".equals(method)) {
+                if (testSample == null) {
+                    testSample = "";
+                }
+                res = tempClient.invokeInterfaceByGet(id, testSample, path);
+            } else if ("POST".equals(method)) {
+                res = tempClient.invokeInterfaceByPost(id, testSample, path);
+            }
+        } catch (UnsupportedEncodingException e) {
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "接口连通性验证失败，调用接口失败");
         }
 
+        if (StrUtil.isBlank(res)) {
+            //系统内部异常
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "接口连通性验证失败，接口返回结果为空");
+        }
+        log.info("接口连通性验证成功，可以上线");
+
+        //更新接口状态
         InterfaceInfo interfaceInfo = new InterfaceInfo();
         interfaceInfo.setId(id);
         interfaceInfo.setStatus(InterfaceInfoStatusEnum.ONLINE.getValue());
@@ -317,6 +338,9 @@ public class InterfaceInfoController {
         long id = interfaceInfoInvokeRequest.getId();
         //提取请求参数
         String userRequestParams = interfaceInfoInvokeRequest.getUserRequestParams();
+        if (userRequestParams == null) {
+            userRequestParams = "";
+        }
 
         InterfaceInfo interfaceInfo = interfaceInfoService.getById(id);
         //判断是否存在这个接口
@@ -338,18 +362,26 @@ public class InterfaceInfoController {
         //创建一个临时的SamoyerApiClient对象，并传入ak和sk
         SamoyerApiClient tempClient = new SamoyerApiClient(accessKey, secretKey);
 
-        //解析传递过来的参数
-        Gson gson = new Gson();
-        com.samoyer.samoyerapiclientsdk.model.User user = gson.fromJson(userRequestParams, com.samoyer.samoyerapiclientsdk.model.User.class);
         //调用方法，传入对象，获取用户名
         //getUserNameByPost中会构建请求信息，比如构建请求头，比如对请求体加密为sign
         //构建完后使用HttpRequest发送请求到网关
         //先被网关拦截到，再由网关进行转发，其中网关会对请求体中的sign进行校验
-        String userNameByPost = tempClient.getUserNameByPost(user);
+        String method = interfaceInfo.getMethod();
+        String path = "/general/api";
 
-//        System.out.println(userRequestParams);
-//        String userNameByPost = tempClient.getNameByGet();
+        String result = null;
+        try {
+            if ("GET".equals(method)) {
+                //发送到网关：http://localhost:8080/api/general/api/get
+                result = tempClient.invokeInterfaceByGet(id, userRequestParams, path + "/get");
+            } else if ("POST".equals(method)) {
+                //http://localhost:8080/api/general/api/post
+                result = tempClient.invokeInterfaceByPost(id, userRequestParams, path + "/post");
+            }
+        } catch (UnsupportedEncodingException e) {
+            throw new RuntimeException(e);
+        }
 
-        return ResultUtils.success(userNameByPost);
+        return ResultUtils.success(result);
     }
 }
