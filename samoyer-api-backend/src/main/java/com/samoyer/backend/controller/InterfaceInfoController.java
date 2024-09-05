@@ -253,30 +253,35 @@ public class InterfaceInfoController {
             throw new BusinessException(ErrorCode.NOT_FOUND_ERROR);
         }
 
-        //2. TODO 判断接口是否可以调用
+        //2. 判断接口是否可以调用
         User loginUser = userService.getLoginUser(request);
         //创建一个临时的SamoyerApiClient对象，并传入ak和sk
         SamoyerApiClient tempClient = new SamoyerApiClient(loginUser.getAccessKey(), loginUser.getSecretKey());
         //使用字段testSample里的例子进行连通性测试
         String testSample = oldInterfaceInfo.getTestSample();
+        if (testSample == null) {
+            testSample = "";
+        }
         String method = oldInterfaceInfo.getMethod();
-        String path = oldInterfaceInfo.getUrl();
+        String path = "/general/api";
         String res = "";
         try {
             if ("GET".equals(method)) {
-                if (testSample == null) {
-                    testSample = "";
-                }
-                res = tempClient.invokeInterfaceByGet(id, testSample, path);
+                //发送到网关：http://localhost:8080/api/general/api/get
+                res = tempClient.invokeInterfaceByGet(id, testSample, path + "/get");
             } else if ("POST".equals(method)) {
-                res = tempClient.invokeInterfaceByPost(id, testSample, path);
+                //http://localhost:8080/api/general/api/post
+                res = tempClient.invokeInterfaceByPost(id, testSample, path + "/post");
             }
-        } catch (UnsupportedEncodingException e) {
+        } catch (Exception e) {
+            log.error("接口连通性验证失败");
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "接口连通性验证失败，调用接口失败");
         }
 
+
         if (StrUtil.isBlank(res)) {
             //系统内部异常
+            log.error("接口连通性验证结果为空");
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "接口连通性验证失败，接口返回结果为空");
         }
         log.info("接口连通性验证成功，可以上线");
